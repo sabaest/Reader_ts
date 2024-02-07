@@ -1,0 +1,97 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <style>
+            header {
+                grid-area: header;
+            }
+            body {
+                background-color: brown;
+                margin: 0;
+                padding: 0;
+                display: grid;
+                grid-template-rows: 0 1fr 2em;
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "header"
+                    "main"
+                    "footer";
+                height: 100vh;
+            }
+            .thumb-area {
+                grid-area: main;
+                overflow-y: scroll;
+                background-color: yellow;
+                border-color: lightyellow;
+            }
+            .thumb-list {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                list-style: none;
+                list-style-position: inside;
+            }
+            .thumb-list li {
+                padding: 0px 0px;
+                background: #e3f6f5;
+                border-bottom: solid 1px #3dbfb8;
+            }
+            .node-btn {
+                height: 30px;
+                width: 100%;
+                border: 0;
+                background: transparent;
+            }
+            .node-btn:hover {
+                background-color: rgba(255, 0, 0, 0.128);
+            }
+            .node-btn:active {
+                box-shadow:
+                    inset -1px -1px 2px rgb(255 255 255 / 60%),
+                    inset 1px 1px 2px rgb(0 0 0 / 60%);
+            }
+            .node-btn-on {
+                height: 30px;
+                width: 100%;
+                border: 0;
+                background-color: rgba(255, 28, 28, 0.255);
+            }
+            .node-btn-on:hover {
+                background-color: rgba(255, 0, 0, 0.192);
+            }
+            .node-btn-on:active {
+                box-shadow:
+                    inset -1px -1px 2px rgb(255 255 255 / 60%),
+                    inset 1px 1px 2px rgb(0 0 0 / 60%);
+            }
+            footer {
+                grid-area: footer;
+                background: #44aa33;
+            }
+            .close-btn {
+                height: 100%;
+                width: 100%;
+                background-color: rgb(120, 120, 120, 1);
+            }
+            .close-btn:hover {
+                background-color: rgb(240, 240, 240, 1);
+            }
+            .close-btn:active {
+                box-shadow:
+                    inset -1px -1px 2px rgb(255 255 255 / 60%),
+                    inset 1px 1px 2px rgb(0 0 0 / 60%);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="thumb-area">
+            <ul id="thumb-list" class="thumb-list"></ul>
+        </div>
+    </body>
+    <footer class="close-area">
+        <input class="close-btn" type="button" value="×" />
+    </footer>
+    <script> var exports = {}; </script>
+    <script src="../../build/renderer/sub_renderer.js"></script>
+</html>
