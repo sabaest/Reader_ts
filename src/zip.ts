@@ -1,6 +1,6 @@
 ﻿import admZip from "adm-zip";
-import { IMAGE_EXT } from "./constants"
-import { IArchive } from "./archive";
+import { IMAGE_EXT } from "./constants.js"
+import { IArchive } from "./archive.js";
 
 export default class Zip implements IArchive {
 
@@ -12,8 +12,13 @@ export default class Zip implements IArchive {
 
     public constructor(file: string) {
         this.file = file;
-        this.zip = new admZip(this.file);
-        this.checkContents().then((result) => this.pageNumber = result);
+    }
+
+    public static async build(file: string) : Promise<Zip> {
+        const p = new Zip(file);
+        p.zip = new admZip(file);
+        p.checkContents().then((result) => p.pageNumber = result);
+        return p;
     }
 
     public getPageNumber(): number {
@@ -35,20 +40,22 @@ export default class Zip implements IArchive {
     }
 
     private async checkContents(): Promise<number> {
-        let num = 0;
-        this.index = [];
+        return new Promise((resolve) => {
+            let num = 0;
+            this.index = [];
 
-        for (const entry of this.zip.getEntries()) {
-            let name = entry.name;
-            let ext = name.split('.').pop();
-
-            if (Object.keys(IMAGE_EXT).includes(ext)) {
-                num++;
-                this.index.push(entry.name);
+            for (const entry of this.zip.getEntries()) {
+                let name = entry.name;
+                let ext = name.split('.').pop();
+                if (Object.keys(IMAGE_EXT).includes(ext)) {
+                    num++;
+                    this.index.push(entry.name);
+                }
             }
-        }
 
-        return num - 1;
+            resolve(num - 1);
+        });
+
     }
 
     private getMime(file: string): string {

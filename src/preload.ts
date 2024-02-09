@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer } from 'electron/renderer';
+﻿const { ipcRenderer, contextBridge } = require('electron');
 
 contextBridge.exposeInMainWorld(
     'api', {
@@ -11,3 +11,10 @@ contextBridge.exposeInMainWorld(
         closeSubWindow: () => ipcRenderer.invoke('close-sub-window'),
     });
 
+contextBridge.exposeInMainWorld(
+    'sub', {
+        on: (channel: string, callback: any) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
+        send: (channel: string, args: any) => ipcRenderer.invoke(channel, args),
+        getIndexList: async () => ipcRenderer.invoke('get-index'),
+        pageJump: (jump: number) => ipcRenderer.invoke('page-jump', jump),
+    });

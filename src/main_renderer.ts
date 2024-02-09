@@ -147,7 +147,10 @@ const drawImage = (drawScale: number) => {
 
 // #region events
 
-window.api.on('image-send', async (result: any) => { console.log(result);draw(result); });
+window.api.on('image-send', async (result: any) => {
+    console.log(result);
+    draw(result);
+});
 
 window.api.on('sub-window-off', () => {
     onSubBtn.classList.remove('sub-window-on');

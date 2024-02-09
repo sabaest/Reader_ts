@@ -1,6 +1,6 @@
 ﻿import { app } from 'electron';
-import { createWindow, setting } from './main/index';
-import SettingManager from './main/setting';
+import { createWindow, setting } from './index.js';
+import SettingManager from './setting.js';
 
 app.on('window-all-closed', (e) => {
     saveSetting()

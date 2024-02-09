@@ -1,5 +1,5 @@
 ﻿import { BrowserWindow, dialog } from 'electron';
-import { TARGET_EXT } from "./constants";
+import { TARGET_EXT } from "./constants.js";
 
 export default class DialogManager {
 

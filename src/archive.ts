@@ -1,6 +1,6 @@
-﻿import { MODE } from "./constants";
-import Zip from "./zip"
-import Pdf from "./pdf";
+﻿import { MODE } from "./constants.js";
+import Zip from "./zip.js"
+import Pdf from "./pdf.js";
 
 export interface IArchive {
     getImageBlob(page: number): Promise<any>;
@@ -19,12 +19,16 @@ export default class ArchiveManager {
 
     public constructor (file: string) {
         this.File = file;
-        this.Mode = this.checkFileExt();
+    }
 
-        if (this.Mode != MODE.none) {
-            this.getArchiveSelect();
-            this.PageNumber = this.archive.getPageNumber();
+    public static async build(file: string): Promise<ArchiveManager> {
+        let b = new ArchiveManager(file);
+        b.Mode = b.checkFileExt();
+        if (b.Mode != MODE.none) {
+            await b.getArchiveSelect();
+            b.PageNumber = b.archive.getPageNumber();
         }
+        return b;
     }
 
     public getMode() {
@@ -54,13 +58,14 @@ export default class ArchiveManager {
         return MODE.none;
     }
 
-    private getArchiveSelect() {
+    private async getArchiveSelect() {
         switch (this.Mode) {
             case MODE.zip:
-                this.archive = new Zip(this.File);
+                this.archive = await Zip.build(this.File);
                 break;
             case MODE.pdf:
-                // this.archive = new Pdf(this.File);
+                this.archive = await Pdf.build(this.File);
+                console.log(this.archive);
                 break;
             default:
         }

@@ -1,7 +1,11 @@
 ﻿import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import DialogManeger from './dialog';
-import ArchiveManager from './archive';
+import DialogManeger from './dialog.js';
+import ArchiveManager from './archive.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let win: BrowserWindow;
 let swin: BrowserWindow;
@@ -18,7 +22,7 @@ export const createWindow = async (args: any | undefined) => {
 
     win = new BrowserWindow({
         webPreferences: {
-            preload: path.join(__dirname, 'main_preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
         }
     });
 
@@ -28,7 +32,9 @@ export const createWindow = async (args: any | undefined) => {
         if (args.max) win.maximize();
     }
 
-    win.loadFile('./src/renderer/main.html');
+    // win.webContents.openDevTools();
+
+    win.loadFile(path.join(__dirname, '../src/view/main.html'));
     win.menuBarVisible = false;
 
     await StartupLoad(win);
@@ -55,23 +61,27 @@ const createSubWindow = () => {
         focusable: true,
         alwaysOnTop: false,
         webPreferences: {
-            preload: path.join(__dirname, 'sub_preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
         }
     });
 
-    swin.loadFile('./src/renderer/sub.html');
+    swin.loadFile(path.join(__dirname, './src/view/sub.html'));
     swin.menuBarVisible = false;
 }
 
 const StartupLoad = async (window: BrowserWindow): Promise<void> => {
     if (startup == undefined) { return; }
 
-    window.webContents.on('did-finish-load', () => {
+    window.webContents.on('did-finish-load', async () => {
 
-        archive = new ArchiveManager(startup);
-        const data = archive.getImageBlob(archive.NowPage);
-
-        window.webContents.send('image-send', data);
+        ArchiveManager.build(startup)
+            .then((result) => {
+                return new Promise((resolve) => {
+                    archive = result;
+                    resolve(result.getImageBlob(archive.NowPage));
+                });
+            })
+            .then((result) => window.webContents.send('image-send', result));
     });
 }
 
@@ -95,14 +105,14 @@ ipcMain.handle('file-dialog', async (e: Electron.IpcMainInvokeEvent) => {
     let result = DialogManeger.OpenFileDialog(e);
     if (result == '') { return; }
 
-    archive = new ArchiveManager(result);
+    archive = await ArchiveManager.build(result);
     return archive.getImageBlob(archive.NowPage);
 });
 
 ipcMain.handle('file-drop', async (e: Electron.IpcMainInvokeEvent, filepath: string) => {
     if (filepath == '') { return }
 
-    archive = new ArchiveManager(filepath);
+    archive = await ArchiveManager.build(filepath);
     return archive.getImageBlob(archive.NowPage);
 });
 
@@ -140,3 +150,4 @@ ipcMain.handle('page-jump', (e: Electron.IpcMainEvent, jump: number) => {
 });
 
 // #endregion
+
