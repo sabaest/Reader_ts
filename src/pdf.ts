@@ -1,28 +1,35 @@
-﻿import { PDFDocumentProxy, getDocument } from "pdfjs-dist";
+﻿import { getDocument } from "pdfjs-dist";
 import { IArchive } from "./archive.js";
+import fs from "fs";
 
 export default class Pdf implements IArchive {
 
-    private pdf: PDFDocumentProxy;
     private pageNumber: number = -1;
     private index: string[] = [];
+    private data: Buffer;
 
     constructor() {}
 
     public static async build(file: string) : Promise<Pdf> {
-        const p = new Pdf();
-        p.pdf = await getDocument(file).promise;
-        p.pageNumber = p.pdf.numPages;
-        p.buildIndexes(p.pageNumber).then((result) => p.index = result);
-        return p;
+        return new Promise((resolve) => {
+            const p = new Pdf();
+            p.readFileAsync(file).then((data) => {
+                p.data = data;
+                getDocument(file).promise
+                    .then((doc) => {
+                        p.pageNumber = doc.numPages;
+                        return p.buildIndexes(p.pageNumber);
+                    }).then((result) => {
+                        p.index = result;
+                    });
+                resolve(p);
+            });
+        });
     }
 
     public async getImageBlob(page: number): Promise<any> {
         return new Promise(async (resolve) => {
-            const pageProxy = await this.pdf.getPage(page);
-            const viewport = pageProxy.getViewport();
-            const renderContext = { viewport, };
-            resolve({ Page: pageProxy, Context: renderContext, });
+            resolve({ Data: this.data, Page: page + 1, });
         });
     }
 
@@ -43,6 +50,12 @@ export default class Pdf implements IArchive {
                 index.push((zero + i ).slice(-digit));
             }
             resolve(index);
+        });
+    }
+
+    private readFileAsync(file: string): Promise<Buffer> {
+        return new Promise((resolve, reject) => {
+            resolve(fs.readFileSync(file));
         });
     }
 }

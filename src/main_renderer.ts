@@ -1,4 +1,7 @@
-﻿const body = document.body;
+﻿// import { PDFPageProxy, getDocument, } from 'pdfjs-dist';
+import * as pdf from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
+
+const body = document.body;
 const container = document.getElementById('app');
 const btnArea = document.getElementById('btn-area');
 const graph = document.getElementById('graph') as HTMLCanvasElement;
@@ -13,8 +16,14 @@ let _img: HTMLImageElement;
 
 let _scale = 1;
 let _scrollPosition:[number, number] = [0, 0];
+let _originalSize:[number, number] = [0, 0];
 let _isDrag: number = 0;
 let _isFit: boolean = false;
+let _page;
+let _renderInProgress = true;
+let drawing;
+
+pdf.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
 
 // #region functions
 
@@ -26,41 +35,23 @@ const preventDefault = (e: DragEvent) => {
 const checkCenter = () => {
     if (window.innerWidth > graph.width) {
         body.style.width = "100%";
-        // html.style.width = "100%";
     }
     else {
         body.style.width = "auto";
-        // html.style.width = "auto";
     }
     if (window.innerHeight > graph.height) {
         body.style.height = "100%";
-        // html.style.height = "100%";
     }
     else {
         body.style.height = "auto";
-        // html.style.height = "auto";
     }
 }
 
-const draw = (arg: any) => {
-    _img = new Image();
-    _img.onload = (e) => {
-        body.style.backgroundColor = "#888888";
-        container.hidden = true;
-        btnArea.hidden = false;
-        graph.hidden = false;
-
-        graph.width = _img.width;
-        graph.height = _img.height;
-
-        drawImage(_scale);
-    };
-
-    let blob = new Blob([arg.Buffer], { type: arg.Type });
-    let urlCreator = window.URL || window.webkitURL;
-    let src = urlCreator.createObjectURL(blob);
-
-    _img.src = src;
+const styleChange = () => {
+    body.style.backgroundColor = "#888888";
+    container.hidden = true;
+    btnArea.hidden = false;
+    graph.hidden = false;
 }
 
 const clear = (arg: any) => {
@@ -86,7 +77,7 @@ const zoom = (e) => {
             _scale = Math.max(_scale, MIN_SCALE);
         }
 
-        drawImage(_scale);
+        draw(_scale);
     }
 }
 
@@ -105,32 +96,26 @@ const fit = () => {
         }
     }
 
-    drawImage(fit);
+    draw(fit);
 }
 
 const defScale = () => {
-    drawImage(1);
+    draw(1);
 }
 
-const drawImage = (drawScale: number) => {
+const draw = (drawScale: number) => {
 
-    // 倍率調整
-    drawScale -= 0.0000000001;
-
-    let center = [
+    const center = [
         document.documentElement.clientWidth / 2,
         document.documentElement.clientHeight / 2
     ];
 
-    let vcenter = [scrollX + center[0], scrollY + center[1]];
-    let nowsize = [graph.width, graph.height];
+    const vcenter = [scrollX + center[0], scrollY + center[1]];
+    const nowsize = [graph.width, graph.height];
 
-    graph.width = Math.ceil(_img.width * drawScale);
-    graph.height = Math.ceil(_img.height * drawScale);
+    drawing(drawScale);
 
-    ctx.drawImage(_img, 0, 0, graph.width, graph.height);
-
-    let new_scroll = [
+    const new_scroll = [
         Math.floor(graph.width * vcenter[0] / nowsize[0]) - center[0],
         Math.floor(graph.height * vcenter[1] / nowsize[1]) - center[1]
     ];
@@ -143,14 +128,91 @@ const drawImage = (drawScale: number) => {
     document.title = _scale.toString();
 }
 
+const fetchZip = (scale: number) => {
+    // 倍率調整
+    scale -= 0.0000000001;
+
+    graph.width = _originalSize[0] * scale;
+    graph.height = _originalSize[1] * scale;
+
+    ctx.scale(scale, scale);
+
+    ctx.drawImage(_img, 0, 0);
+}
+
+const startZip = (arg: any) => {
+    _img = new Image();
+    _img.onload = (e) => {
+        styleChange();
+
+        _originalSize = [_img.width, _img.height];
+
+        graph.width = _img.width;
+        graph.height = _img.height;
+
+        draw(_scale);
+    };
+
+    let blob = new Blob([arg.Buffer], { type: arg.Type });
+    let urlCreator = window.URL || window.webkitURL;
+    let src = urlCreator.createObjectURL(blob);
+
+    _img.src = src;
+}
+
+const fetchPdf = (scale: number) => {
+    if (_renderInProgress) {
+        _renderInProgress = false;
+
+        scale -= 0.0000000001;
+
+        const view = _page.getViewport({ scale: scale, });
+        graph.width = view.width * scale;
+        graph.height = view.height * scale;
+
+        ctx.scale(scale, scale);
+
+        _page.render({ canvasContext: ctx, viewport: view, }).promise
+            .finally(() => _renderInProgress = true);
+    }
+}
+
+const startPdf = (arg: any, scale: number) => {
+    pdf.getDocument(arg.Data).promise
+        .then((doc) => {
+            return doc.getPage(arg.Page);
+        }).then((page) => {
+            _page = page;
+            const view = page.getViewport({ scale: scale, });
+            graph.width = view.width;
+            graph.height = view.height;
+            _img = new Image();
+            _originalSize = [view.width, view.height];
+            return page.render({ canvasContext: ctx, viewport: view, }).promise;
+        }).then(() => {
+            styleChange();
+        });
+
+}
+
+const selector = (params: any) => {
+    if (params.Data != undefined) {
+        // Pdfモード
+        drawing = (scale: number) => fetchPdf(scale);
+        startPdf(params, _scale);
+    }
+    else if (params.Buffer != undefined) {
+        // Zipモード
+        drawing = (scale: number) => fetchZip(scale);
+        startZip(params);
+    }
+}
+
 // #endregion
 
 // #region events
 
-window.api.on('image-send', async (result: any) => {
-    console.log(result);
-    draw(result);
-});
+window.api.on('image-send', async (result: any) => selector(result));
 
 window.api.on('sub-window-off', () => {
     onSubBtn.classList.remove('sub-window-on');
@@ -204,7 +266,7 @@ container.addEventListener('drop', (e) => {
     preventDefault(e);
 
     for (const file of e.dataTransfer!.files) {
-        window.api.getDrop(file.path).then((result) => draw(result));
+        window.api.getDrop(file.path).then((result) => selector(result));
     }
 });
 
@@ -213,7 +275,7 @@ container.addEventListener('click', async (e) => {
     switch (e.button) {
         case 0:
             // 左クリック
-            window.api.openFileDialog().then((result) => draw(result));
+            window.api.openFileDialog().then((result) => selector(result));
             break;
         default:
     }
@@ -248,19 +310,19 @@ graph.addEventListener('mouseup', (e) => {
             }
             else {
                 // 次のページ
-                window.api.pageShift(1).then((result) => draw(result));
+                window.api.pageShift(1).then((result) => selector(result));
             }
             window.removeEventListener('mousemove', zoom)
             break;
         case 3:
             // 戻るクリック
             // 前のページ
-            window.api.pageShift(-1).then((result) => draw(result));
+            window.api.pageShift(-1).then((result) => selector(result));
             break;
         case 4:
             // 進むクリック
             // 次のページ
-            window.api.pageShift(1).then((result) => draw(result));
+            window.api.pageShift(1).then((result) => selector(result));
             break;
         default:
             alert('Error');
@@ -272,7 +334,7 @@ graph.addEventListener('dblclick', (e) => {
     switch (e.button) {
         case 0:
             // 前のページ
-            window.api.pageShift(-1).then((result) => draw(result));
+            window.api.pageShift(-1).then((result) => selector(result));
             break;
         default:
     }
@@ -283,7 +345,7 @@ onFitCheck.addEventListener('click', () => {
 
     if (_isFit) {
         _isFit = false;
-        drawImage(_scale);
+        draw(_scale);
         window.scrollTo(0, 0);
     }
     else {

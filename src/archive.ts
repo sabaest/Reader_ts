@@ -46,9 +46,7 @@ export default class ArchiveManager {
     }
 
     private checkFileExt(): MODE {
-        const ext = this.File.split('.').pop();
-        console.log(ext);
-        switch (ext) {
+        switch (this.File.split('.').pop()) {
             case "zip":
                 return MODE.zip;
             case "pdf":
@@ -65,7 +63,6 @@ export default class ArchiveManager {
                 break;
             case MODE.pdf:
                 this.archive = await Pdf.build(this.File);
-                console.log(this.archive);
                 break;
             default:
         }
