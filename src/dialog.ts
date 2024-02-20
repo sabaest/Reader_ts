@@ -1,5 +1,5 @@
 ﻿import { BrowserWindow, dialog } from 'electron';
-import { TARGET_EXT } from "./constants.js";
+import { TARGET_EXT } from './constants.js';
 
 export default class DialogManager {
 
@@ -20,7 +20,7 @@ export default class DialogManager {
         switch (filename) {
             case null:
             case undefined:
-                file = "";
+                file = '';
                 break;
             default:
                 file = filename[0];

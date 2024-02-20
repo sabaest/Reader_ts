@@ -20,7 +20,7 @@ export default class SettingManager {
             x: number, y: number,
             s: number = 1, m: boolean = false): Promise<void> {
 
-        if (typeof w_setting === "number") {
+        if (typeof w_setting === 'number') {
             this.data.width = w_setting;
             this.data.height = h;
             this.data.left = x;

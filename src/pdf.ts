@@ -1,6 +1,6 @@
-﻿import { getDocument } from "pdfjs-dist";
-import { IArchive } from "./archive.js";
-import fs from "fs";
+﻿import { getDocument } from 'pdfjs-dist';
+import { IArchive } from './archive.js';
+import fs from 'fs';
 
 export default class Pdf implements IArchive {
 
@@ -29,7 +29,7 @@ export default class Pdf implements IArchive {
 
     public async getImageBlob(page: number): Promise<any> {
         return new Promise(async (resolve) => {
-            resolve({ Data: this.data, Page: page + 1, });
+            resolve({ Mode: 'pdf', Data: this.data, Page: page + 1, });
         });
     }
 

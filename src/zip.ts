@@ -1,6 +1,6 @@
-﻿import admZip from "adm-zip";
-import { IMAGE_EXT } from "./constants.js"
-import { IArchive } from "./archive.js";
+﻿import admZip from 'adm-zip';
+import { IMAGE_EXT } from './constants.js'
+import { IArchive } from './archive.js';
 
 export default class Zip implements IArchive {
 
@@ -29,6 +29,7 @@ export default class Zip implements IArchive {
         return new Promise((resolve) => {
             const zipEntry = this.zip.getEntries()[page];
             resolve({
+                Mode: 'zip',
                 Buffer: zipEntry.getData(),
                 Mime: this.getMime(zipEntry.name),
             });

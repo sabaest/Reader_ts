@@ -1,6 +1,6 @@
-﻿import { MODE } from "./constants.js";
-import Zip from "./zip.js"
-import Pdf from "./pdf.js";
+﻿import { MODE } from './constants.js';
+import Zip from './zip.js'
+import Pdf from './pdf.js';
 
 export interface IArchive {
     getImageBlob(page: number): Promise<any>;
@@ -11,7 +11,7 @@ export interface IArchive {
 export default class ArchiveManager {
 
     protected archive: IArchive;
-    protected File: string = "";
+    protected File: string = '';
     protected Mode: MODE = MODE.none;
     protected PageNumber: number = -1;
 
@@ -47,9 +47,9 @@ export default class ArchiveManager {
 
     private checkFileExt(): MODE {
         switch (this.File.split('.').pop()) {
-            case "zip":
+            case 'zip':
                 return MODE.zip;
-            case "pdf":
+            case 'pdf':
                 return MODE.pdf;
             default:
         }

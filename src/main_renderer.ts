@@ -1,4 +1,4 @@
-﻿import * as pdf from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
+﻿import * as pdfjs from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
 
 const body = document.body;
 const container = document.getElementById('app');
@@ -12,18 +12,17 @@ const SCALE_STEP = 0.02;
 const MAX_SCALE = 2.5, MIN_SCALE = 0.5;
 const LimitSize = [1920, 1680];
 
+let _archive: IRender;
 let _img: HTMLImageElement;
 
-let _scale = 1;
 let _originalSize:[number, number] = [0, 0];
+let _scale: number = 1;
+let _coefficient: number = 1;
 let _isDrag: number = 0;
 let _isFit: boolean = false;
-let _doc;
-let _renderInProgress = true;
 let _drawing;
-let _coefficient = 1;
 
-pdf.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
+pdfjs.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
 
 // #region functions
 
@@ -34,21 +33,21 @@ const preventDefault = (e: DragEvent) => {
 
 const checkCenter = () => {
     if (window.innerWidth > graph.width) {
-        body.style.width = "100%";
+        body.style.width = '100%';
     }
     else {
-        body.style.width = "auto";
+        body.style.width = 'auto';
     }
     if (window.innerHeight > graph.height) {
-        body.style.height = "100%";
+        body.style.height = '100%';
     }
     else {
-        body.style.height = "auto";
+        body.style.height = 'auto';
     }
 }
 
 const styleChange = () => {
-    body.style.backgroundColor = "#888888";
+    body.style.backgroundColor = '#888888';
     container.hidden = true;
     btnArea.hidden = false;
     graph.hidden = false;
@@ -124,39 +123,7 @@ const draw = (drawScale: number) => {
 
     checkCenter();
 
-    document.title = _scale.toString();
-}
-
-const fetchZip = (scale: number) => {
-    // 倍率調整
-    scale -= 0.0000000001;
-
-    graph.width = _originalSize[0] * scale;
-    graph.height = _originalSize[1] * scale;
-
-    ctx.scale(scale, scale);
-
-    ctx.drawImage(_img, 0, 0);
-}
-
-const startZip = (buffer: Buffer, type: string) => {
-    _img = new Image();
-    _img.onload = (e) => {
-        styleChange();
-
-        _originalSize = [_img.width, _img.height];
-
-        graph.width = _img.width;
-        graph.height = _img.height;
-
-        draw(_scale);
-    };
-
-    let blob = new Blob([buffer], { type: type });
-    let urlCreator = window.URL || window.webkitURL;
-    let src = urlCreator.createObjectURL(blob);
-
-    _img.src = src;
+    document.title = drawScale.toString();
 }
 
 const sizeLimit = (w: number, h: number) => {
@@ -174,61 +141,18 @@ const sizeLimit = (w: number, h: number) => {
     }
 }
 
-const fetchPdf = (pageNum: number, scale: number) => {
-    if (_renderInProgress) {
-        _renderInProgress = false;
-
-        _doc.getPage(pageNum).then((page) => {
-            const view = page.getViewport({ scale: _coefficient, });
-            graph.width = view.width * scale;
-            graph.height = view.height * scale;
-
-            ctx.scale(scale, scale);
-
-            page.render({ canvasContext: ctx, viewport: view, }).promise
-                .finally(() => _renderInProgress = true);
-        });
-    }
-}
-
-const startPdf = (data: Buffer, page: number) => {
-    pdf.getDocument(data).promise
-        .then((doc) => {
-            _doc = doc;
-            return doc.getPage(page);
-        }).then((page) => {
-            let view: pdf.PageViewport = page.getViewport({ scale: 1, });
-            const size = sizeLimit(view.width, view.height);
-
-            view = page.getViewport({ scale: _coefficient, });
-            graph.width = size[0] * _scale ;
-            graph.height = size[1] * _scale;
-
-            ctx.scale(_scale, _scale);
-
-            _img = new Image();
-            return page.render({ canvasContext: ctx, viewport: view, }).promise;
-        }).then(() => {
-            styleChange();
-        });
-}
-
 const selector = (params: any) => {
-    if (params.Data != undefined) {
-        // Pdfモード
-        _drawing = (scale: number) => fetchPdf(params.Page, scale);
-        if (_img == undefined) {
-            startPdf(params.Data, params.Page);
-        }
-        else {
-            draw(_scale);
-        }
+    if (params.Mode == 'pdf') {
+        _archive = new pdf_render();
     }
-    else if (params.Buffer != undefined) {
-        // Zipモード
-        _drawing = (scale: number) => fetchZip(scale);
-        startZip(params.Buffer, params.Type);
+    else if (params.Mode == 'zip') {
+        _archive = new zip_render();
     }
+    else {
+        throw new Error('render error');
+    }
+    _drawing = (scale: number) => _archive.fetch(params, scale);
+    _archive.start(params);
 }
 
 const nextPage = () => {
@@ -397,5 +321,91 @@ onSubBtn.addEventListener('click', () => {
         window.api.send('close-sub-window', {});
     }
 });
+
+// #endregion
+
+// #region class
+
+interface IRender {
+    fetch(data: any, scale: number): void;
+    start(data: any): void;
+}
+
+class zip_render implements IRender {
+
+    fetch(data: any, scale: number) {
+        // 倍率調整
+        scale -= 0.0000000001;
+
+        graph.width = _originalSize[0] * scale;
+        graph.height = _originalSize[1] * scale;
+
+        ctx.scale(scale, scale);
+
+        ctx.drawImage(_img, 0, 0);
+    }
+
+    start(data: any) {
+        _img = new Image();
+        _img.onload = (e) => {
+            styleChange();
+            _originalSize = [_img.width, _img.height];
+            graph.width = _img.width;
+            graph.height = _img.height;
+            draw(_scale);
+        };
+
+        let blob = new Blob([data.Buffer], { type: data.Type });
+        let urlCreator = window.URL || window.webkitURL;
+        let src = urlCreator.createObjectURL(blob);
+
+        _img.src = src;
+    }
+}
+
+class pdf_render implements IRender {
+
+    private _doc: pdfjs.PdfDocumentProxy;
+    private _renderInProgress:boolean = true;
+
+    fetch(data: any, scale: number) {
+        if (this._renderInProgress) {
+            this._renderInProgress = false;
+
+            this._doc.getPage(data.Page).then((page) => {
+                const view = page.getViewport({ scale: _coefficient, });
+                graph.width = view.width * scale;
+                graph.height = view.height * scale;
+
+                ctx.scale(scale, scale);
+
+                page.render({ canvasContext: ctx, viewport: view, }).promise
+                    .finally(() => this._renderInProgress = true);
+            });
+        }
+    }
+
+    start(data: any) {
+        pdfjs.getDocument(data.Data).promise
+            .then((doc) => {
+                this._doc = doc;
+                return doc.getPage(data.Page);
+            }).then((page) => {
+                let view: pdfjs.PageViewport = page.getViewport({ scale: 1, });
+                const size = sizeLimit(view.width, view.height);
+
+                view = page.getViewport({ scale: _coefficient, });
+                graph.width = size[0] * _scale ;
+                graph.height = size[1] * _scale;
+
+                ctx.scale(_scale, _scale);
+
+                _img = new Image();
+                return page.render({ canvasContext: ctx, viewport: view, }).promise;
+            }).then(() => {
+                styleChange();
+            });
+    }
+}
 
 // #endregion
