@@ -34,7 +34,7 @@ export default class Pdf implements IArchive {
     }
 
     public getPageNumber(): number {
-        return this.pageNumber;
+        return this.pageNumber - 1;
     }
     public getIndexList(): string[] {
         return this.index;

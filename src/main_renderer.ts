@@ -1,5 +1,4 @@
-﻿// import { PDFPageProxy, getDocument, } from 'pdfjs-dist';
-import * as pdf from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
+﻿import * as pdf from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
 
 const body = document.body;
 const container = document.getElementById('app');
@@ -9,19 +8,20 @@ const ctx = graph.getContext('2d');
 const onFitCheck = document.querySelector('.fit-off');
 const onSubBtn = document.querySelector('.sub-window-off');
 
-const SCALE_STEP = 0.01;
-const MAX_SCALE = 1.5, MIN_SCALE = 0.5;
+const SCALE_STEP = 0.02;
+const MAX_SCALE = 2.5, MIN_SCALE = 0.5;
+const LimitSize = [1920, 1680];
 
 let _img: HTMLImageElement;
 
 let _scale = 1;
-let _scrollPosition:[number, number] = [0, 0];
 let _originalSize:[number, number] = [0, 0];
 let _isDrag: number = 0;
 let _isFit: boolean = false;
-let _page;
+let _doc;
 let _renderInProgress = true;
-let drawing;
+let _drawing;
+let _coefficient = 1;
 
 pdf.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
 
@@ -113,7 +113,7 @@ const draw = (drawScale: number) => {
     const vcenter = [scrollX + center[0], scrollY + center[1]];
     const nowsize = [graph.width, graph.height];
 
-    drawing(drawScale);
+    _drawing(drawScale);
 
     const new_scroll = [
         Math.floor(graph.width * vcenter[0] / nowsize[0]) - center[0],
@@ -121,7 +121,6 @@ const draw = (drawScale: number) => {
     ];
 
     window.scrollTo(new_scroll[0], new_scroll[1]);
-    _scrollPosition = [scrollX, scrollY];
 
     checkCenter();
 
@@ -140,7 +139,7 @@ const fetchZip = (scale: number) => {
     ctx.drawImage(_img, 0, 0);
 }
 
-const startZip = (arg: any) => {
+const startZip = (buffer: Buffer, type: string) => {
     _img = new Image();
     _img.onload = (e) => {
         styleChange();
@@ -153,59 +152,95 @@ const startZip = (arg: any) => {
         draw(_scale);
     };
 
-    let blob = new Blob([arg.Buffer], { type: arg.Type });
+    let blob = new Blob([buffer], { type: type });
     let urlCreator = window.URL || window.webkitURL;
     let src = urlCreator.createObjectURL(blob);
 
     _img.src = src;
 }
 
-const fetchPdf = (scale: number) => {
-    if (_renderInProgress) {
-        _renderInProgress = false;
+const sizeLimit = (w: number, h: number) => {
 
-        scale -= 0.0000000001;
-
-        const view = _page.getViewport({ scale: scale, });
-        graph.width = view.width * scale;
-        graph.height = view.height * scale;
-
-        ctx.scale(scale, scale);
-
-        _page.render({ canvasContext: ctx, viewport: view, }).promise
-            .finally(() => _renderInProgress = true);
+    if (w > LimitSize[0]) {
+        _coefficient = LimitSize[0] / w;
+        return [LimitSize[0], h * _coefficient];
+    }
+    else if (h > LimitSize[1]) {
+        _coefficient = LimitSize[1] / h;
+        return [w * _coefficient, LimitSize[1]];
+    }
+    else {
+        return [w, h];
     }
 }
 
-const startPdf = (arg: any, scale: number) => {
-    pdf.getDocument(arg.Data).promise
+const fetchPdf = (pageNum: number, scale: number) => {
+    if (_renderInProgress) {
+        _renderInProgress = false;
+
+        _doc.getPage(pageNum).then((page) => {
+            const view = page.getViewport({ scale: _coefficient, });
+            graph.width = view.width * scale;
+            graph.height = view.height * scale;
+
+            ctx.scale(scale, scale);
+
+            page.render({ canvasContext: ctx, viewport: view, }).promise
+                .finally(() => _renderInProgress = true);
+        });
+    }
+}
+
+const startPdf = (data: Buffer, page: number) => {
+    pdf.getDocument(data).promise
         .then((doc) => {
-            return doc.getPage(arg.Page);
+            _doc = doc;
+            return doc.getPage(page);
         }).then((page) => {
-            _page = page;
-            const view = page.getViewport({ scale: scale, });
-            graph.width = view.width;
-            graph.height = view.height;
+            let view: pdf.PageViewport = page.getViewport({ scale: 1, });
+            const size = sizeLimit(view.width, view.height);
+
+            view = page.getViewport({ scale: _coefficient, });
+            graph.width = size[0] * _scale ;
+            graph.height = size[1] * _scale;
+
+            ctx.scale(_scale, _scale);
+
             _img = new Image();
-            _originalSize = [view.width, view.height];
             return page.render({ canvasContext: ctx, viewport: view, }).promise;
         }).then(() => {
             styleChange();
         });
-
 }
 
 const selector = (params: any) => {
     if (params.Data != undefined) {
         // Pdfモード
-        drawing = (scale: number) => fetchPdf(scale);
-        startPdf(params, _scale);
+        _drawing = (scale: number) => fetchPdf(params.Page, scale);
+        if (_img == undefined) {
+            startPdf(params.Data, params.Page);
+        }
+        else {
+            draw(_scale);
+        }
     }
     else if (params.Buffer != undefined) {
         // Zipモード
-        drawing = (scale: number) => fetchZip(scale);
-        startZip(params);
+        _drawing = (scale: number) => fetchZip(scale);
+        startZip(params.Buffer, params.Type);
     }
+}
+
+const nextPage = () => {
+    window.api.pageShift(1)
+        .then((result) => selector(result))
+        .finally(() => window.scrollTo(0, 0));
+}
+
+const prevPage = () => {
+    window.api.pageShift(-1)
+        .then((result) => selector(result))
+        .finally(() => window.scrollTo(0, 0));
 }
 
 // #endregion
@@ -234,27 +269,64 @@ window.addEventListener('resize', (e) => {
 
 window.addEventListener('mousedown', (e) => {
     e.preventDefault();
-    switch (e.button) {
-        case 2:
-            if (_img != undefined) {
+
+    if (_img != undefined) {
+        switch (e.button) {
+            case 2:
                 _isDrag = 1;
                 window.addEventListener('mousemove', zoom);
                 break;
-            }
-        default:
+            default:
+        }
     }
 });
 
 window.addEventListener('mouseup', (e) => {
     e.preventDefault();
-    switch (e.button) {
-        case 2:
-            // ドラッグ終了
-            if (_isDrag > 1) {
-                _isDrag = 0;
+
+    if (_img != undefined) {
+        switch (e.button) {
+            case 0:
+                break;
+            case 1:
+                // ホイールクリック
+                (onFitCheck as HTMLInputElement).click();
+                break;
+            case 2:
+                // ドラッグ終了
+                console.log('window');
+                if (_isDrag > 1) {
+                    _isDrag = 0;
+                }
+                else {
+                    nextPage();
+                }
                 window.removeEventListener('mousemove', zoom)
-            }
-            break;
+                break;
+            case 3:
+                // 戻るクリック
+                nextPage();
+                break;
+            case 4:
+                // 進むクリック
+                prevPage();
+                break;
+            default:
+        }
+    }
+});
+
+window.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+
+    if (_img != undefined) {
+        switch (e.button) {
+            case 0:
+                // 前のページ
+                prevPage();
+                break;
+            default:
+        }
     }
 });
 
@@ -274,7 +346,6 @@ container.addEventListener('click', async (e) => {
     e.preventDefault();
     switch (e.button) {
         case 0:
-            // 左クリック
             window.api.openFileDialog().then((result) => selector(result));
             break;
         default:
@@ -283,6 +354,7 @@ container.addEventListener('click', async (e) => {
 
 graph.addEventListener('mousedown', (e) => {
     e.preventDefault();
+
     switch (e.button) {
         case 0:
             graph.addEventListener('mousemove', move);
@@ -296,45 +368,7 @@ graph.addEventListener('mouseup', (e) => {
 
     switch (e.button) {
         case 0:
-            // 左クリック
             graph.removeEventListener('mousemove', move);
-            break;
-        case 1:
-            // ホイールクリック
-            (onFitCheck as HTMLInputElement).click();
-            break;
-        case 2:
-            // ドラッグ終了
-            if (_isDrag > 1) {
-                _isDrag = 0;
-            }
-            else {
-                // 次のページ
-                window.api.pageShift(1).then((result) => selector(result));
-            }
-            window.removeEventListener('mousemove', zoom)
-            break;
-        case 3:
-            // 戻るクリック
-            // 前のページ
-            window.api.pageShift(-1).then((result) => selector(result));
-            break;
-        case 4:
-            // 進むクリック
-            // 次のページ
-            window.api.pageShift(1).then((result) => selector(result));
-            break;
-        default:
-            alert('Error');
-    }
-});
-
-graph.addEventListener('dblclick', (e) => {
-    e.preventDefault();
-    switch (e.button) {
-        case 0:
-            // 前のページ
-            window.api.pageShift(-1).then((result) => selector(result));
             break;
         default:
     }
