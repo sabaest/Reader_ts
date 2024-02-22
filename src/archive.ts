@@ -4,41 +4,60 @@ import Pdf from './pdf.js';
 
 export interface IArchive {
     getImageBlob(page: number): Promise<any>;
+    getPageCount(): number;
     getPageNumber(): number;
+    getPageName(): string;
     getIndexList(): string[];
 }
 
 export default class ArchiveManager {
 
     protected archive: IArchive;
-    protected File: string = '';
-    protected Mode: MODE = MODE.none;
-    protected PageNumber: number = -1;
-
-    public NowPage: number = 0;
+    protected file: string = '';
+    protected mode: MODE = MODE.none;
+    protected pageCount: number = -1;
+    protected pageNumber: number = 0;
+    protected pageName: string = '';
 
     public constructor (file: string) {
-        this.File = file;
+        this.file = file;
     }
 
     public static async build(file: string): Promise<ArchiveManager> {
-        let b = new ArchiveManager(file);
-        b.Mode = b.checkFileExt();
-        if (b.Mode != MODE.none) {
-            await b.getArchiveSelect();
-            b.PageNumber = b.archive.getPageNumber();
-        }
-        return b;
+        return new Promise(async (resolve) => {
+            const b = new ArchiveManager(file);
+            b.mode = b.checkFileExt();
+            if (b.mode != MODE.none) {
+                b.getArchiveSelect().then(() => resolve(b));
+            }
+        });
+    }
+
+    public getFileName() {
+        return this.file;
+    }
+
+    public getPageName() {
+        return this.archive.getPageName();
+    }
+
+    public getPageCount() {
+        return this.archive.getPageCount();
+    }
+
+    public getPageNumber() {
+        return this.archive.getPageNumber();
     }
 
     public getMode() {
-        return this.Mode;
+        return this.mode;
     }
 
-    public async getImageBlob (page: number): Promise<any> {
-        const p = this.archive.getPageNumber();
-        this.NowPage = page > p ? 0 : page < 0 ? p : page;
-        return this.archive.getImageBlob(this.NowPage);
+    public async getImageBlob(page: number): Promise<any> {
+        return this.archive.getImageBlob(page).then((result) => {
+            this.pageName = this.archive.getPageName();
+            return result;
+        });
     }
 
     public getIndexList(): string[] {
@@ -46,7 +65,7 @@ export default class ArchiveManager {
     }
 
     private checkFileExt(): MODE {
-        switch (this.File.split('.').pop()) {
+        switch (this.file.split('.').pop()) {
             case 'zip':
                 return MODE.zip;
             case 'pdf':
@@ -57,12 +76,12 @@ export default class ArchiveManager {
     }
 
     private async getArchiveSelect() {
-        switch (this.Mode) {
+        switch (this.mode) {
             case MODE.zip:
-                this.archive = await Zip.build(this.File);
+                this.archive = await Zip.build(this.file);
                 break;
             case MODE.pdf:
-                this.archive = await Pdf.build(this.File);
+                this.archive = await Pdf.build(this.file);
                 break;
             default:
         }

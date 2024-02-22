@@ -14,13 +14,13 @@ const LimitSize = [1920, 1680];
 
 let _archive: IRender;
 let _img: HTMLImageElement;
+let _drawing: any;
 
 let _originalSize:[number, number] = [0, 0];
 let _scale: number = 1;
 let _coefficient: number = 1;
 let _isDrag: number = 0;
 let _isFit: boolean = false;
-let _drawing;
 
 pdfjs.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
 
@@ -122,8 +122,7 @@ const draw = (drawScale: number) => {
     window.scrollTo(new_scroll[0], new_scroll[1]);
 
     checkCenter();
-
-    document.title = drawScale.toString();
+    changeTitle();
 }
 
 const sizeLimit = (w: number, h: number) => {
@@ -153,6 +152,7 @@ const selector = (params: any) => {
     }
     _drawing = (scale: number) => _archive.fetch(params, scale);
     _archive.start(params);
+    changeTitle();
 }
 
 const nextPage = () => {
@@ -167,11 +167,35 @@ const prevPage = () => {
         .finally(() => window.scrollTo(0, 0));
 }
 
+const changeTitle = () => {
+    document.title = '';
+    document.title += fileName;
+    console.log('pageName : ' + pageName);
+    console.log('pageNum : ' + pageNum);
+    if (pageName === '') {
+        document.title += ' [' + pageNum + '] ';
+    }
+    else {
+        document.title += ' [' + pageName + '] ';
+    }
+    document.title += Math.floor(_scale * 100) / 100;
+}
+
 // #endregion
+
+let fileName: string;
+let pageNum: number;
+let pageName: string | undefined;
 
 // #region events
 
-window.api.on('image-send', async (result: any) => selector(result));
+window.api.on('image-send', (result: any) => selector(result));
+
+window.api.on('get-archve', (result: any) => {
+    fileName = result.FileName;
+    pageNum = result.PageNum;
+    pageName = result.PageName;
+});
 
 window.api.on('sub-window-off', () => {
     onSubBtn.classList.remove('sub-window-on');
@@ -386,6 +410,7 @@ class pdf_render implements IRender {
     }
 
     start(data: any) {
+        // console.log('data.Page : ' + data.Page);
         pdfjs.getDocument(data.Data).promise
             .then((doc) => {
                 this._doc = doc;

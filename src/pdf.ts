@@ -1,12 +1,17 @@
-﻿import { getDocument } from 'pdfjs-dist';
+﻿import { loadavg } from 'os';
+import * as pdfjs from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
 import { IArchive } from './archive.js';
 import fs from 'fs';
 
+pdfjs.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';
+
 export default class Pdf implements IArchive {
 
-    private pageNumber: number = -1;
+    private pageCount: number = -1;
+    private pageNumber: number = 1;
     private index: string[] = [];
     private data: Buffer;
+    private loading: boolean = true;
 
     constructor() {}
 
@@ -15,27 +20,44 @@ export default class Pdf implements IArchive {
             const p = new Pdf();
             p.readFileAsync(file).then((data) => {
                 p.data = data;
-                getDocument(file).promise
-                    .then((doc) => {
-                        p.pageNumber = doc.numPages;
-                        return p.buildIndexes(p.pageNumber);
-                    }).then((result) => {
-                        p.index = result;
-                    });
+                p.loading = false;
+                pdfjs.getDocument(file).promise.then((doc) => {
+                    p.pageCount = doc.numPages;
+                    p.buildIndexes(p.pageCount).then((result) => p.index = result);
+                    p.loading = true;
+                });
                 resolve(p);
             });
         });
     }
 
     public async getImageBlob(page: number): Promise<any> {
-        return new Promise(async (resolve) => {
-            resolve({ Mode: 'pdf', Data: this.data, Page: page + 1, });
-        });
+        if (!this.loading) {
+            return new Promise((resolve) => {
+                resolve({ Mode: 'pdf', Data: this.data, Page: 1, });
+            });
+        }
+        else {
+            return new Promise((resolve) => {
+                let p = page < 1 ? this.pageCount : page > this.pageCount ? 1 : page ;
+                this.pageNumber = p;
+                resolve({ Mode: 'pdf', Data: this.data, Page: p, });
+            });
+        }
     }
 
-    public getPageNumber(): number {
-        return this.pageNumber - 1;
+    public getPageCount(): number {
+        return this.pageCount;
     }
+
+    public getPageNumber() {
+        return this.pageNumber;
+    }
+
+    public getPageName(): string {
+        return '';
+    }
+
     public getIndexList(): string[] {
         return this.index;
     }

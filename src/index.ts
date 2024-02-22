@@ -45,7 +45,7 @@ const createSubWindow = () => {
     indexList = archive.getIndexList();
 
     win.webContents.send('to-sub', {
-        NowPage: archive.NowPage,
+        NowPage: archive.getPageNumber(),
     });
 
     let [mw, mh] = win.getSize();
@@ -73,12 +73,11 @@ const StartupLoad = async (window: BrowserWindow): Promise<void> => {
     if (startup == undefined) { return; }
 
     window.webContents.on('did-finish-load', async () => {
-
         ArchiveManager.build(startup)
             .then((result) => {
                 return new Promise((resolve) => {
                     archive = result;
-                    resolve(result.getImageBlob(archive.NowPage));
+                    resolve(result.getImageBlob(archive.getPageNumber()));
                 });
             })
             .then((result) => window.webContents.send('image-send', result));
@@ -97,6 +96,26 @@ const swinPosition = (subw: number, subh: number): [number, number] => {
     return [rx, ry];
 }
 
+const sendArchive = () => {
+    win.webContents.send('get-archve', {
+        FileName: path.basename(archive.getFileName()),
+        PageNum: archive.getPageNumber(),
+        PageName: archive.getPageName(),
+    })
+}
+
+const drawImage = async (file: string) => {
+    return new Promise((resolve) => {
+        ArchiveManager.build(file).then((result) => {
+            archive = result;
+            archive.getImageBlob(archive.getPageNumber()).then((result) => {
+                sendArchive();
+                resolve(result);
+            });
+        });
+    });
+}
+
 // #endregion
 
 // #region events
@@ -104,21 +123,19 @@ const swinPosition = (subw: number, subh: number): [number, number] => {
 ipcMain.handle('file-dialog', async (e: Electron.IpcMainInvokeEvent) => {
     let result = DialogManeger.OpenFileDialog(e);
     if (result == '') { return; }
-
-    archive = await ArchiveManager.build(result);
-    return archive.getImageBlob(archive.NowPage);
+    return drawImage(result);
 });
 
 ipcMain.handle('file-drop', async (e: Electron.IpcMainInvokeEvent, filepath: string) => {
     if (filepath == '') { return }
-
-    archive = await ArchiveManager.build(filepath);
-    return archive.getImageBlob(archive.NowPage);
+    return drawImage(filepath);
 });
 
 ipcMain.handle('page-shift', async (e: Electron.IpcMainEvent, shift: number) => {
-    let p = archive.NowPage + shift;
-    return archive.getImageBlob(p);
+    return archive.getImageBlob(archive.getPageNumber() + shift).then((result) => {
+        sendArchive();
+        return result;
+    });
 });
 
 ipcMain.handle('send-scale', async (arg: any) => {
@@ -145,8 +162,11 @@ ipcMain.handle('close-sub-window', () => {
 
 ipcMain.handle('get-index', async (e) => indexList);
 
-ipcMain.handle('page-jump', (e: Electron.IpcMainEvent, jump: number) => {
-    archive.getImageBlob(jump).then((result) => win.webContents.send('image-send', result));
+ipcMain.handle('page-jump', async (e: Electron.IpcMainEvent, jump: number) => {
+    return archive.getImageBlob(jump).then((result) => {
+        sendArchive();
+        win.webContents.send('image-send', result);
+    });
 });
 
 // #endregion

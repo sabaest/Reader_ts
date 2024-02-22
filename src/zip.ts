@@ -5,29 +5,35 @@ import { IArchive } from './archive.js';
 export default class Zip implements IArchive {
 
     private zip: admZip = null;
-    private file: string = '';
-    private mime: string = ''
-    private pageNumber: number = -1;
+    private pageCount: number = -1;
+    private pageNumber: number = 0;
+    private pageName: string = '';
     private index: string[] = [];
 
-    public constructor(file: string) {
-        this.file = file;
-    }
+    public constructor() {}
 
     public static async build(file: string) : Promise<Zip> {
-        const p = new Zip(file);
-        p.zip = new admZip(file);
-        p.checkContents().then((result) => p.pageNumber = result);
-        return p;
+        return new Promise((resolve) => {
+            const p = new Zip();
+            p.zip = new admZip(file);
+            p.checkContents().then((result) => p.pageCount = result);
+            resolve(p);
+        });
     }
 
-    public getPageNumber(): number {
+    public getPageCount(): number {
+        return this.pageCount;
+    }
+
+    public getPageNumber() {
         return this.pageNumber;
     }
 
     public async getImageBlob(page: number): Promise<any> {
         return new Promise((resolve) => {
-            const zipEntry = this.zip.getEntries()[page];
+            this.pageNumber = page < 0 ? this.pageCount : page > this.pageCount ? 0 : page ;
+            const zipEntry = this.zip.getEntries()[this.pageNumber];
+            this.pageName = zipEntry.entryName;
             resolve({
                 Mode: 'zip',
                 Buffer: zipEntry.getData(),
@@ -38,6 +44,10 @@ export default class Zip implements IArchive {
 
     public getIndexList(): string[] {
         return this.index;
+    }
+
+    public getPageName() {
+        return this.pageName;
     }
 
     private async checkContents(): Promise<number> {
