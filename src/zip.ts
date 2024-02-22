@@ -29,6 +29,10 @@ export default class Zip implements IArchive {
         return this.pageNumber;
     }
 
+    public getBasePageNumber() {
+        return 0;
+    }
+
     public async getImageBlob(page: number): Promise<any> {
         return new Promise((resolve) => {
             this.pageNumber = page < 0 ? this.pageCount : page > this.pageCount ? 0 : page ;

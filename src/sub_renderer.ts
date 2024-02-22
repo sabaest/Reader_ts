@@ -18,7 +18,6 @@ const buildList = (indexList: string[]) => {
         newLi.append(nodeInput);
 
         nodeInput.addEventListener('click', (e) => {
-            console.log('click! : ' + index);
             window.sub.pageJump(Number(index));
             nowPage(Number(index));
         });
@@ -32,7 +31,6 @@ const nowPage = (page: number) => {
 
     for (const [index, item2] of Object.entries(items)) {
         const btn2 = item2.getElementsByTagName('input')[0];
-        console.log('all btn off!');
         btn2.classList.remove('node-btn-on');
     }
 

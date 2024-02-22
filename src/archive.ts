@@ -6,6 +6,7 @@ export interface IArchive {
     getImageBlob(page: number): Promise<any>;
     getPageCount(): number;
     getPageNumber(): number;
+    getBasePageNumber(): number;
     getPageName(): string;
     getIndexList(): string[];
 }
@@ -15,9 +16,6 @@ export default class ArchiveManager {
     protected archive: IArchive;
     protected file: string = '';
     protected mode: MODE = MODE.none;
-    protected pageCount: number = -1;
-    protected pageNumber: number = 0;
-    protected pageName: string = '';
 
     public constructor (file: string) {
         this.file = file;
@@ -49,15 +47,16 @@ export default class ArchiveManager {
         return this.archive.getPageNumber();
     }
 
+    public getBasePageNumber() {
+        return this.archive.getBasePageNumber();
+    }
+
     public getMode() {
         return this.mode;
     }
 
     public async getImageBlob(page: number): Promise<any> {
-        return this.archive.getImageBlob(page).then((result) => {
-            this.pageName = this.archive.getPageName();
-            return result;
-        });
+        return this.archive.getImageBlob(page);
     }
 
     public getIndexList(): string[] {

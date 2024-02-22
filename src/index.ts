@@ -65,7 +65,7 @@ const createSubWindow = () => {
         }
     });
 
-    swin.loadFile(path.join(__dirname, './src/view/sub.html'));
+    swin.loadFile(path.join(__dirname, '../src/view/sub.html'));
     swin.menuBarVisible = false;
 }
 
@@ -163,7 +163,7 @@ ipcMain.handle('close-sub-window', () => {
 ipcMain.handle('get-index', async (e) => indexList);
 
 ipcMain.handle('page-jump', async (e: Electron.IpcMainEvent, jump: number) => {
-    return archive.getImageBlob(jump).then((result) => {
+    return archive.getImageBlob(archive.getBasePageNumber() + jump).then((result) => {
         sendArchive();
         win.webContents.send('image-send', result);
     });

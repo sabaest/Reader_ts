@@ -54,6 +54,10 @@ export default class Pdf implements IArchive {
         return this.pageNumber;
     }
 
+    public getBasePageNumber() {
+        return 1;
+    }
+
     public getPageName(): string {
         return '';
     }
@@ -66,9 +70,9 @@ export default class Pdf implements IArchive {
         return new Promise((resolve) => {
             const digit = page.toString().length;
             const zero = '0'.repeat(digit);
-            let i = 0;
+            let i = 1;
             let index: string[] = [];
-            for (i = 0; i < page; i++) {
+            for (i = 1; i <= page; i++) {
                 index.push((zero + i ).slice(-digit));
             }
             resolve(index);
