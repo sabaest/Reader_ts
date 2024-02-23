@@ -6,8 +6,8 @@
 }
 
 export interface IApi {
-    on: (channel: string, callback: any) => Promise<void>;
-    send: (channel: string, args: any) => Promise<void>;
+    reciever: (channel: string, callback: any) => Promise<void>;
+    sender: (channel: string, args: any) => Promise<any>;
     openFileDialog: () => Promise<any>;
     getDrop: (file: string) => Promise<any>;
     pageShift: (shift: number) => Promise<any>;
@@ -16,8 +16,8 @@ export interface IApi {
 }
 
 export interface ISubApi {
-    on: (channel: string, callback: any) => Promise<void>;
-    send: (channel: string, args: any) => Promise<void>;
+    reciever: (channel: string, callback: any) => Promise<void>;
+    sender: (channel: string, args: any) => Promise<any>;
     getIndexList: () => Promise<string[]>;
     pageJump: (jump: number) => void;
 }

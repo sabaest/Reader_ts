@@ -9,7 +9,7 @@ const onFitCheck = document.querySelector('.fit-off');
 const onSubBtn = document.querySelector('.sub-window-off');
 
 const SCALE_STEP = 0.02;
-const MAX_SCALE = 2.5, MIN_SCALE = 0.5;
+const MAX_SCALE = 2.5, MIN_SCALE = 0.1;
 const LimitSize = [1920, 1680];
 
 let _archive: IRender;
@@ -31,7 +31,7 @@ const preventDefault = (e: DragEvent) => {
     e.stopPropagation();
 };
 
-const checkCenter = () => {
+const centering = () => {
     if (window.innerWidth > graph.width) {
         body.style.width = '100%';
     }
@@ -83,19 +83,14 @@ const zoom = (e) => {
 const fit = () => {
     let fit = 1;
 
-    if (window.innerWidth == _img.width || window.innerHeight == _img.height) {
-        return;
+    if (_originalSize[0] > _originalSize[1]) {
+        fit = window.innerWidth / _originalSize[0];
     }
     else {
-        if (window.innerWidth > window.innerHeight) {
-            fit = window.innerHeight / _img.height;
-        }
-        else if (window.innerWidth < window.innerHeight) {
-            fit = window.innerWidth / _img.width;
-        }
+        fit = window.innerHeight / _originalSize[1];
     }
 
-    draw(fit);
+    _scale = fit;
 }
 
 const defScale = () => {
@@ -121,7 +116,7 @@ const draw = (drawScale: number) => {
 
     window.scrollTo(new_scroll[0], new_scroll[1]);
 
-    checkCenter();
+    centering();
     changeTitle();
 }
 
@@ -153,6 +148,8 @@ const selector = (params: any) => {
     _drawing = (scale: number) => _archive.fetch(params, scale);
     _archive.start(params);
     changeTitle();
+
+    window.api.sender('sync2sub', {});
 }
 
 const nextPage = () => {
@@ -168,47 +165,37 @@ const prevPage = () => {
 }
 
 const changeTitle = () => {
-    document.title = '';
-    document.title += fileName;
-    console.log('pageName : ' + pageName);
-    console.log('pageNum : ' + pageNum);
-    if (pageName === '') {
-        document.title += ' [' + pageNum + '] ';
-    }
-    else {
-        document.title += ' [' + pageName + '] ';
-    }
-    document.title += Math.floor(_scale * 100) / 100;
+    window.sub.sender('get-page', {}).then((result) => {
+        document.title = '';
+        document.title += result.FileName;
+        if (result.PageName === '') {
+            document.title += ' [' + result.PageNumber + '] ';
+        }
+        else {
+            document.title += ' [' + result.PageName + '] ';
+        }
+        document.title += Math.floor(_scale * 100) / 100;
+    });
 }
 
 // #endregion
 
-let fileName: string;
-let pageNum: number;
-let pageName: string | undefined;
-
 // #region events
 
-window.api.on('image-send', (result: any) => selector(result));
+window.api.reciever('image-send', (result: any) => selector(result));
 
-window.api.on('get-archve', (result: any) => {
-    fileName = result.FileName;
-    pageNum = result.PageNum;
-    pageName = result.PageName;
-});
-
-window.api.on('sub-window-off', () => {
+window.api.reciever('sub-window-off', () => {
     onSubBtn.classList.remove('sub-window-on');
 });
 
 window.addEventListener('beforeunload', () => {
-    window.api.send('send-scale', { Scale: _scale, });
+    window.api.sender('send-scale', { Scale: _scale, });
 });
 
 window.addEventListener('resize', (e) => {
     if (!_isFit
         && (window.innerWidth > graph.scrollWidth || window.innerHeight > graph.scrollHeight)) {
-        checkCenter();
+        centering();
     }
     else if (_isFit) {
         fit();
@@ -242,13 +229,10 @@ window.addEventListener('mouseup', (e) => {
                 break;
             case 2:
                 // ドラッグ終了
-                console.log('window');
-                if (_isDrag > 1) {
-                    _isDrag = 0;
-                }
-                else {
+                if (_isDrag != 2) {
                     nextPage();
                 }
+                _isDrag = 0;
                 window.removeEventListener('mousemove', zoom)
                 break;
             case 3:
@@ -270,7 +254,6 @@ window.addEventListener('dblclick', (e) => {
     if (_img != undefined) {
         switch (e.button) {
             case 0:
-                // 前のページ
                 prevPage();
                 break;
             default:
@@ -327,22 +310,23 @@ onFitCheck.addEventListener('click', () => {
 
     if (_isFit) {
         _isFit = false;
-        draw(_scale);
-        window.scrollTo(0, 0);
     }
     else {
         _isFit = true;
         fit();
     }
+    draw(_scale);
+
+    window.scrollTo(0, 0);
 });
 
 onSubBtn.addEventListener('click', () => {
     onSubBtn.classList.toggle('sub-window-on');
     if (onSubBtn.classList.contains('sub-window-on')) {
-        window.api.send('open-sub-window', {});
+        window.api.sender('open-sub-window', {});
     }
     else {
-        window.api.send('close-sub-window', {});
+        window.api.sender('close-sub-window', {});
     }
 });
 
@@ -365,7 +349,6 @@ class zip_render implements IRender {
         graph.height = _originalSize[1] * scale;
 
         ctx.scale(scale, scale);
-
         ctx.drawImage(_img, 0, 0);
     }
 
@@ -373,9 +356,12 @@ class zip_render implements IRender {
         _img = new Image();
         _img.onload = (e) => {
             styleChange();
-            _originalSize = [_img.width, _img.height];
-            graph.width = _img.width;
-            graph.height = _img.height;
+            const size = sizeLimit(_img.width, _img.height);
+            _originalSize = [size[0], size[1]];
+            graph.width = _originalSize[0];
+            graph.height = _originalSize[1];
+
+            if (_isFit) fit();
             draw(_scale);
         };
 
@@ -410,7 +396,6 @@ class pdf_render implements IRender {
     }
 
     start(data: any) {
-        // console.log('data.Page : ' + data.Page);
         pdfjs.getDocument(data.Data).promise
             .then((doc) => {
                 this._doc = doc;
@@ -418,14 +403,18 @@ class pdf_render implements IRender {
             }).then((page) => {
                 let view: pdfjs.PageViewport = page.getViewport({ scale: 1, });
                 const size = sizeLimit(view.width, view.height);
+                _originalSize = [size[0], size[1]];
 
                 view = page.getViewport({ scale: _coefficient, });
-                graph.width = size[0] * _scale ;
+
+                if (_isFit) fit();
+                graph.width = size[0] * _scale;
                 graph.height = size[1] * _scale;
 
                 ctx.scale(_scale, _scale);
 
                 _img = new Image();
+
                 return page.render({ canvasContext: ctx, viewport: view, }).promise;
             }).then(() => {
                 styleChange();

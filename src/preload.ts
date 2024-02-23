@@ -2,8 +2,8 @@
 
 contextBridge.exposeInMainWorld(
     'api', {
-        on: (channel: string, callback: any) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
-        send: (channel: string, args: any) => ipcRenderer.invoke(channel, args),
+        reciever: (channel: string, callback: any) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
+        sender: (channel: string, args: any) => ipcRenderer.invoke(channel, args),
         openFileDialog: () => ipcRenderer.invoke('file-dialog'),
         getDrop: (filepath: string) => ipcRenderer.invoke('file-drop', filepath),
         pageShift: async (shift: number) => ipcRenderer.invoke('page-shift', shift),
@@ -13,8 +13,8 @@ contextBridge.exposeInMainWorld(
 
 contextBridge.exposeInMainWorld(
     'sub', {
-        on: (channel: string, callback: any) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
-        send: (channel: string, args: any) => ipcRenderer.invoke(channel, args),
+        reciever: (channel: string, callback: any) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
+        sender: (channel: string, args: any) => ipcRenderer.invoke(channel, args),
         getIndexList: async () => ipcRenderer.invoke('get-index'),
         pageJump: (jump: number) => ipcRenderer.invoke('page-jump', jump),
     });

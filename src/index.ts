@@ -32,8 +32,6 @@ export const createWindow = async (args: any | undefined) => {
         if (args.max) win.maximize();
     }
 
-    // win.webContents.openDevTools();
-
     win.loadFile(path.join(__dirname, '../src/view/main.html'));
     win.menuBarVisible = false;
 
@@ -43,10 +41,6 @@ export const createWindow = async (args: any | undefined) => {
 const createSubWindow = () => {
 
     indexList = archive.getIndexList();
-
-    win.webContents.send('to-sub', {
-        NowPage: archive.getPageNumber(),
-    });
 
     let [mw, mh] = win.getSize();
     let [sx, sy] = swinPosition(200, mh);
@@ -96,20 +90,11 @@ const swinPosition = (subw: number, subh: number): [number, number] => {
     return [rx, ry];
 }
 
-const sendArchive = () => {
-    win.webContents.send('get-archve', {
-        FileName: path.basename(archive.getFileName()),
-        PageNum: archive.getPageNumber(),
-        PageName: archive.getPageName(),
-    })
-}
-
 const drawImage = async (file: string) => {
     return new Promise((resolve) => {
         ArchiveManager.build(file).then((result) => {
             archive = result;
             archive.getImageBlob(archive.getPageNumber()).then((result) => {
-                sendArchive();
                 resolve(result);
             });
         });
@@ -132,10 +117,7 @@ ipcMain.handle('file-drop', async (e: Electron.IpcMainInvokeEvent, filepath: str
 });
 
 ipcMain.handle('page-shift', async (e: Electron.IpcMainEvent, shift: number) => {
-    return archive.getImageBlob(archive.getPageNumber() + shift).then((result) => {
-        sendArchive();
-        return result;
-    });
+    return archive.getImageBlob(archive.getPageNumber() + shift);
 });
 
 ipcMain.handle('send-scale', async (arg: any) => {
@@ -164,9 +146,24 @@ ipcMain.handle('get-index', async (e) => indexList);
 
 ipcMain.handle('page-jump', async (e: Electron.IpcMainEvent, jump: number) => {
     return archive.getImageBlob(archive.getBasePageNumber() + jump).then((result) => {
-        sendArchive();
         win.webContents.send('image-send', result);
     });
+});
+
+ipcMain.handle('sync2sub', async (e) => {
+    if (swin === undefined) return;
+    swin.webContents.send('sync2sub', {
+        PageName: archive.getPageName(),
+        PageNumber: archive.getPageNumber(),
+    });
+});
+
+ipcMain.handle('get-page', () => {
+    return {
+        FileName: path.basename(archive.getFileName()),
+        PageName: archive.getPageName(),
+        PageNumber: archive.getPageNumber(),
+    };
 });
 
 // #endregion
