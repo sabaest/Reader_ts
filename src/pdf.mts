@@ -1,6 +1,6 @@
 ﻿import { loadavg } from 'os';
-import * as pdfjs from '../node_modules/pdfjs-dist/build/pdf.min.mjs';
-import { IArchive } from './archive.js';
+import * as pdfjs from 'pdfjs-dist/build/pdf.min.mjs';
+import { IArchive } from './archive.mjs';
 import fs from 'fs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = '../build/pdf.worker.min.mjs';

@@ -1,8 +1,8 @@
 ﻿import { BrowserWindow, ipcMain } from 'electron';
-import path from 'path';
-import DialogManeger from './dialog.js';
-import ArchiveManager from './archive.js';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import DialogManeger from './dialog.mjs';
+import ArchiveManager from './archive.mjs';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,7 +63,7 @@ const createSubWindow = () => {
     swin.menuBarVisible = false;
 }
 
-const StartupLoad = async (window: BrowserWindow): Promise<void> => {
+const StartupLoad = (window: BrowserWindow): Promise<void> => {
     if (startup == undefined) { return; }
 
     window.webContents.on('did-finish-load', async () => {
@@ -75,6 +75,8 @@ const StartupLoad = async (window: BrowserWindow): Promise<void> => {
                 });
             })
             .then((result) => window.webContents.send('image-send', result));
+        console.log('startup:' + startup);
+        // await drawImage(startup).then(() => console.log('startup end'));
     });
 }
 
@@ -92,6 +94,7 @@ const swinPosition = (subw: number, subh: number): [number, number] => {
 
 const drawImage = async (file: string) => {
     return new Promise((resolve) => {
+        console.log(file);
         ArchiveManager.build(file).then((result) => {
             archive = result;
             archive.getImageBlob(archive.getPageNumber()).then((result) => {

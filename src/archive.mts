@@ -1,6 +1,6 @@
-﻿import { MODE } from './constants.js';
-import Zip from './zip.js'
-import Pdf from './pdf.js';
+﻿import { MODE } from './constants.mjs';
+import Zip from './zip.mjs'
+import Pdf from './pdf.mjs';
 
 export interface IArchive {
     getImageBlob(page: number): Promise<any>;

@@ -1,6 +1,6 @@
 ﻿import admZip from 'adm-zip';
-import { IMAGE_EXT } from './constants.js'
-import { IArchive } from './archive.js';
+import { IMAGE_EXT } from './constants.mjs'
+import { IArchive } from './archive.mjs';
 
 export default class Zip implements IArchive {
 
