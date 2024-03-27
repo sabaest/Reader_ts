@@ -1,0 +1,32 @@
+{
+  "name": "reader_ts",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "./build/begin.mjs",
+  "scripts": {
+    "test": "tsc -p . && electron .",
+    "build": "tsc",
+    "prestart": "npm run build",
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@napi-rs/canvas": "^0.1.45",
+    "@types/adm-zip": "^0.5.5",
+    "@types/electron": "^1.6.10",
+    "@types/node": "^20.11.7",
+    "electron": "^28.1.4",
+    "electron-prebuilt": "^1.4.13",
+    "mime-types": "^2.1.35",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@types/pdfjs-dist": "^2.10.378",
+    "adm-zip": "^0.5.10",
+    "bootstrap": "^5.3.2",
+    "electron-store": "^8.1.0",
+    "pdfjs-dist": "^4.0.379"
+  }
+}
